@@ -1,0 +1,43 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+      - '[0-9]+.[0-9]+'
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Build (Release)
+        run: msbuild StepGui\StepGui.csproj /p:Configuration=Release /p:Platform=AnyCPU /v:m /nologo
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $ver = "${{ github.ref_name }}"
+          $out = "StepGui-$ver"
+          $stage = Join-Path $env:RUNNER_TEMP $out
+          New-Item -ItemType Directory -Force -Path $stage | Out-Null
+          Copy-Item StepGui\bin\Release\* $stage -Recurse -Force
+          Remove-Item (Join-Path $stage '*.pdb') -ErrorAction SilentlyContinue
+          if (Test-Path (Join-Path $stage 'certs')) { Remove-Item (Join-Path $stage 'certs') -Recurse -Force }
+          Compress-Archive -Path (Join-Path $stage '*') -DestinationPath "$out.zip"
+          Write-Output "packed $out.zip"
+
+      - name: Create Release and Upload
+        uses: softprops/action-gh-release@v2
+        with:
+          name: StepGui ${{ github.ref_name }}
+          files: StepGui-*.zip
+          generate_release_notes: true
