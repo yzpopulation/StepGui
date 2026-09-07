@@ -6,6 +6,11 @@ on:
       - 'v*'
       - '[0-9]+.[0-9]+'
   workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号，如 1.0（手动触发必填，将自动创建同名 tag）'
+        required: false
+        default: ''
 
 jobs:
   release:
@@ -15,6 +20,23 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: ver
+        shell: pwsh
+        run: |
+          if ($env:GITHUB_REF_TYPE -eq 'tag') {
+            $v = $env:GITHUB_REF_NAME
+          }
+          else {
+            $v = "${{ inputs.version }}".Trim()
+          }
+          if (-not $v) {
+            Write-Error "手动触发时必须在 version 输入框填写版本号（如 1.0），或改为推送 tag 触发"
+            exit 1
+          }
+          Write-Output "version=$v" >> $env:GITHUB_OUTPUT
+          Write-Output "release version: $v"
 
       - name: Download step.exe
         shell: pwsh
@@ -35,7 +57,7 @@ jobs:
       - name: Package
         shell: pwsh
         run: |
-          $ver = "${{ github.ref_name }}"
+          $ver = "${{ steps.ver.outputs.version }}"
           $out = "StepGui-$ver"
           $stage = Join-Path $env:RUNNER_TEMP $out
           New-Item -ItemType Directory -Force -Path $stage | Out-Null
@@ -48,6 +70,7 @@ jobs:
       - name: Create Release and Upload
         uses: softprops/action-gh-release@v2
         with:
-          name: StepGui ${{ github.ref_name }}
+          tag_name: ${{ steps.ver.outputs.version }}
+          name: StepGui ${{ steps.ver.outputs.version }}
           files: StepGui-*.zip
           generate_release_notes: true
