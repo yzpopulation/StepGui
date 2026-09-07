@@ -16,6 +16,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Download step.exe
+        shell: pwsh
+        run: |
+          $zip = Join-Path $env:RUNNER_TEMP 'step_windows_amd64.zip'
+          Invoke-WebRequest -Uri 'https://github.com/smallstep/cli/releases/download/v0.30.6/step_windows_amd64.zip' -OutFile $zip
+          $dest = Join-Path $env:RUNNER_TEMP 'step_zip'
+          Expand-Archive -Path $zip -DestinationPath $dest -Force
+          Copy-Item (Join-Path $dest 'step_windows_amd64\bin\step.exe') 'StepGui\step.exe' -Force
+          StepGui\step.exe version
+
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
 
